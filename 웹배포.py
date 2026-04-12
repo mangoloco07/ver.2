@@ -85,7 +85,7 @@ def analyze_path(path_data, user_type):
 
     return penalty, ", ".join(list(set(reasons)))
 
-# 5. UI 구성
+#UI
 st.title("♿ 장애인의 대중교통 이용 소요시간 ")
 st.markdown("---")
 
@@ -108,36 +108,19 @@ with st.sidebar:
     search_clicked = st.button("경로 탐색 시작", use_container_width=True)
 
 # 6. 결과 출력
-if search_clicked:
-    formatted_time = d_date.strftime('%Y%m%d') + d_time.strftime('%H%M')
-    url = f"https://api.odsay.com/v1/api/searchPubTransPathT?SX={sx}&SY={sy}&EX={ex}&EY={ey}&apiKey={ODSAY_KEY}&SearchPathType=0&departure_time={formatted_time}"
+if search_btn:
+    departure_time = d_date.strftime('%Y%m%d') + d_time.strftime('%H%M')
+    url = f"https://api.odsay.com/v1/api/searchPubTransPathT?SX={sx}&SY={sy}&EX={ex}&EY={ey}&apiKey={ODSAY_KEY}&SearchPathType=0&departure_time={departure_time}"
     
-    with st.spinner("ODsay 데이터를 분석 중입니다..."):
+    headers = {
+        "Referer": "http://gis.com" 
+    }
+    
+    with st.spinner("최적 경로 분석 중..."):
         try:
-            res = requests.get(url).json()
+            # headers=headers 를 추가하여 오디세이 서버를 통과합니다.
+            res = requests.get(url, headers=headers).json()
+            
             if 'result' not in res:
-                st.warning("오류")
-            else:
-                st.subheader(f"{u_type} 기준 분석 결과")
-                
-                for i, path in enumerate(res['result']['path'][:3]):
-                    n_time = path['info']['totalTime']
-                    p_time, reason = analyze_path(path, user_type_code)
-                    total_time = n_time + p_time
-                    
-                    with st.container():
-                        col1, col2 = st.columns([1, 3])
-                        with col1:
-                            st.metric(f"대안 {i+1}", f"{total_time}분", f"+{p_time}분", delta_color="inverse")
-                        with col2:
-                            summary = []
-                            for sub in path['subPath']:
-                                if sub['trafficType'] == 1: summary.append(f"🚇{sub['lane'][0]['name']}")
-                                elif sub['trafficType'] == 2: summary.append(f"🚌{sub['lane'][0]['busNo']}")
-                                elif sub['trafficType'] == 3 and sub['distance'] > 0: summary.append(f"🚶")
-                            
-                            st.write(f"**경로:** {' → '.join(summary)}")
-                            st.write(f"**지연 사유:** {reason if reason else '없음'}")
-                        st.divider()
-        except Exception as e:
-            st.error(f"오류: {e}")
+                error_msg = res.get('error', [{}])[0].get('message', '알 수 없는 에러')
+                st.error(f"오류 발생: {error_msg}")
