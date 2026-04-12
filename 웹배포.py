@@ -17,19 +17,20 @@ def load_data():
     def smart_read_csv(filename):
         encodings = ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']
         for enc in encodings:
-            try:
-                return pd.read_csv(filename, encoding=enc, low_memory=False)
-            except:
-                continue
+            return pd.read_csv(filename, encoding=enc, low_memory=False)    
         return pd.DataFrame()
 
+    def read_parquet_data(filename):
+        return pd.read_parquet(filename, engine='pyarrow')
+
+    # walking.csv 용량이 너무 커서 walking.parquet으로 컨버트 
     bit_df = smart_read_csv('BIT.csv')
     low_bus_df = smart_read_csv('low.csv')
-    walking_df = smart_read_csv('walking.csv')
+    walking_df = read_parquet_data('walking.parquet') 
+    
     return bit_df, low_bus_df, walking_df
 
 bit_df, low_bus_df, walking_df = load_data()
-
 def analyze_path(path_data, user_type):
     penalty = 0
     reasons = []
