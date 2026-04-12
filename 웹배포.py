@@ -4,7 +4,6 @@ import requests
 import pyproj
 from datetime import datetime
 
-# 1. 페이지 설정
 st.set_page_config(page_title="장애인 vs 일반인 대중교통 이용 소요시간", layout="wide")
 
 # 2. API key (Streamlit Secrets)
@@ -15,15 +14,19 @@ transformer = pyproj.Transformer.from_crs("epsg:4326", "epsg:5174", always_xy=Tr
 @st.cache_data
 def load_data():
     def smart_read_csv(filename):
-        encodings = ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']
+        # 인코딩 에러 방지
+        encodings = ['utf-8-sig', 'cp949', 'euc-kr', 'utf-8']
         for enc in encodings:
-            return pd.read_csv(filename, encoding=enc, low_memory=False)    
+            try:
+                return pd.read_csv(filename, encoding=enc, low_memory=False)
+            except:
+                continue
         return pd.DataFrame()
 
     def read_parquet_data(filename):
+        # walking은 용량이 커서 parquet으로 
         return pd.read_parquet(filename, engine='pyarrow')
 
-    # walking.csv 용량이 너무 커서 walking.parquet으로 컨버트 
     bit_df = smart_read_csv('BIT.csv')
     low_bus_df = smart_read_csv('low.csv')
     walking_df = read_parquet_data('walking.parquet') 
@@ -31,13 +34,13 @@ def load_data():
     return bit_df, low_bus_df, walking_df
 
 bit_df, low_bus_df, walking_df = load_data()
+
 def analyze_path(path_data, user_type):
     penalty = 0
     reasons = []
     
     for sub in path_data['subPath']:
-        # 도보 구간 분석
-        if sub['trafficType'] == 3:
+        if sub['trafficType'] == 3:  # 도보
             check_points = [(sub.get('startX'), sub.get('startY')), (sub.get('endX'), sub.get('endY'))]
             for sx, sy in check_points:
                 if sx and sy:
@@ -47,24 +50,23 @@ def analyze_path(path_data, user_type):
                         (walking_df['G2_YMIN'] <= my) & (walking_df['G2_YMAX'] >= my)
                     ]
                     if not nearby.empty:
-                        if user_type == '1': 
+                        if user_type == '1': # 휠체어
                             width = nearby['BDL_WID'].min()
                             if width < 1.5:
                                 penalty += 15
                                 reasons.append(f"보도폭 협소({width}m)")
                             
-                           
                             if 'SLOPE' in nearby.columns:
                                 slope = nearby['SLOPE'].max()
                                 if slope >= 8: penalty += 20; reasons.append(f"급경사({slope:.1f}%)")
                                 elif slope >= 5: penalty += 10; reasons.append(f"경사구간({slope:.1f}%)")
                         
-                        elif user_type == '2': 
+                        elif user_type == '2': # 시각장애
                             if nearby['BRLL_BLK_SN'].isna().any():
                                 penalty += 15 
                                 reasons.append("점자블록 없음")
 
-        elif sub['trafficType'] == 2:
+        elif sub['trafficType'] == 2: # 버스
             bus_no = sub['lane'][0]['busNo']
             ars_id = str(sub['startArsID']).replace('-', '').zfill(5)
             
@@ -85,12 +87,11 @@ def analyze_path(path_data, user_type):
 
     return penalty, ", ".join(list(set(reasons)))
 
-#UI
-st.title("♿ 장애인의 대중교통 이용 소요시간 ")
+# UI 구성
+st.title("♿ 장애인의 대중교통 이용 소요시간")
 st.markdown("---")
 
 with st.sidebar:
-    st.header("🔍 검색 조건 설정")
     st.header("🔍 검색 조건 설정")
     u_type = st.radio("장애 유형", ("휠체어", "시각장애"), index=0)
     user_type_code = '1' if u_type == "휠체어" else '2'
@@ -105,24 +106,33 @@ with st.sidebar:
     d_date = st.date_input("날짜", datetime.now())
     d_time = st.time_input("시간", datetime.now())
     
-    search_clicked = st.button("경로 탐색 시작", use_container_width=True)
+    # 변수명을 search_btn으로 통일합니다.
+    search_btn = st.button("경로 탐색 시작", use_container_width=True)
 
-# 6. 결과 출력
 if search_btn:
-    departure_time = datetime.now().strftime('%Y%m%d%H%M')
-    url = f"https://api.odsay.com/v1/api/searchPubTransPathT?SX={sx}&SY={sy}&EX={ex}&EY={ey}&apiKey={ODSAY_KEY}&SearchPathType=0&departure_time={departure_time}"
+    formatted_time = d_date.strftime('%Y%m%d') + d_time.strftime('%H%M')
+    url = f"https://api.odsay.com/v1/api/searchPubTransPathT?SX={sx}&SY={sy}&EX={ex}&EY={ey}&apiKey={ODSAY_KEY}&SearchPathType=0&departure_time={formatted_time}"
     
-    # Referer 헤더 (이미지 설정값 반영)
     headers = {"Referer": "http://gis.com"}
     
-    # try 없이 직접 호출 (네트워크 에러 시 앱이 멈춤)
-    res = requests.get(url, headers=headers).json()
-    
-    # 결과 출력
-    for i, path in enumerate(res['result']['path'][:3]):
-        n_time = path['info']['totalTime']
-        p_time, reason = analyze_path(path, user_type_code)
+    with st.spinner("경로를 분석 중입니다..."):
+        res = requests.get(url, headers=headers).json()
         
-        with st.expander(f"대안 {i+1}: {n_time + p_time}분"):
-            st.write(f"**지연 사유:** {reason}")
-            st.info(f"일반 시간: {n_time}분 / 지연: {p_time}분")
+        if 'result' in res:
+            for i, path in enumerate(res['result']['path'][:3]):
+                n_time = path['info']['totalTime']
+                p_time, reason = analyze_path(path, user_type_code)
+                
+                with st.expander(f"대안 {i+1}: 총 {n_time + p_time}분"):
+                    st.write(f"**지연 사유:** {reason if reason else '없음'}")
+                    st.info(f"일반 시간: {n_time}분 / 지연 패널티: {p_time}분")
+                    
+                    # 상세 경로 정보 추가
+                    path_summary = []
+                    for sub in path['subPath']:
+                        if sub['trafficType'] == 1: path_summary.append(f"🚇 {sub['lane'][0]['name']}")
+                        elif sub['trafficType'] == 2: path_summary.append(f"🚌 {sub['lane'][0]['busNo']}")
+                        elif sub['trafficType'] == 3 and sub['distance'] > 0: path_summary.append(f"🚶")
+                    st.caption(" → ".join(path_summary))
+        else:
+            st.error("오류")
