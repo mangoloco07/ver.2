@@ -7,7 +7,7 @@ import re
 
 df = pd.read_csv('taxi.csv', encoding='utf-8')
 
-# 대기시간(계산
+# 대기시간
 df['접수일시_dt'] = pd.to_datetime(df['접수일시'], errors='coerce')
 df['배차일시_dt'] = pd.to_datetime(df['배차일시'], errors='coerce')
 df['wait_time'] = (df['배차일시_dt'] - df['접수일시_dt']).dt.total_seconds() / 60
