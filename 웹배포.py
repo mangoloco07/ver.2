@@ -109,18 +109,20 @@ with st.sidebar:
 
 # 6. 결과 출력
 if search_btn:
-    departure_time = d_date.strftime('%Y%m%d') + d_time.strftime('%H%M')
+    departure_time = datetime.now().strftime('%Y%m%d%H%M')
     url = f"https://api.odsay.com/v1/api/searchPubTransPathT?SX={sx}&SY={sy}&EX={ex}&EY={ey}&apiKey={ODSAY_KEY}&SearchPathType=0&departure_time={departure_time}"
     
-    headers = {
-        "Referer": "http://gis.com" 
-    }
+    # Referer 헤더 (이미지 설정값 반영)
+    headers = {"Referer": "http://gis.com"}
     
-    with st.spinner("최적 경로 분석 중..."):
-        try:
-            # headers=headers 를 추가하여 오디세이 서버를 통과합니다.
-            res = requests.get(url, headers=headers).json()
-            
-            if 'result' not in res:
-                error_msg = res.get('error', [{}])[0].get('message', '알 수 없는 에러')
-                st.error(f"오류 발생: {error_msg}")
+    # try 없이 직접 호출 (네트워크 에러 시 앱이 멈춤)
+    res = requests.get(url, headers=headers).json()
+    
+    # 결과 출력
+    for i, path in enumerate(res['result']['path'][:3]):
+        n_time = path['info']['totalTime']
+        p_time, reason = analyze_path(path, user_type_code)
+        
+        with st.expander(f"대안 {i+1}: {n_time + p_time}분"):
+            st.write(f"**지연 사유:** {reason}")
+            st.info(f"일반 시간: {n_time}분 / 지연: {p_time}분")
