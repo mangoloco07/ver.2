@@ -153,20 +153,26 @@ if search_btn:
                 p_time, reason = analyze_path(path, user_type_code)
 
                 with st.expander(f"대안 {i+1}: 총 {n_time + p_time}분"):
-                col1, col2 = st.columns([1, 1]) 
+                    # 화면 분할
+                    col1, col2 = st.columns([1, 1]) 
+                    
                     with col1:
                         st.write(f"**지연 사유:** {reason if reason else '없음'}")
                         st.info(f"일반 시간: {n_time}분 / 지연 패널티: {p_time}분")
+                        
                         # 경로 상세 정보
                         path_summary = []
                         for sub in path['subPath']:
-                            if sub['trafficType'] == 1: path_summary.append(f"🚇 {sub['lane'][0]['name']}")
-                            elif sub['trafficType'] == 2: path_summary.append(f"🚌 {sub['lane'][0]['busNo']}")
-                            elif sub['trafficType'] == 3 and sub['distance'] > 0: path_summary.append(f"🚶")
-                        st.caption(" → ".join(path_summary)
-                
+                            if sub['trafficType'] == 1: 
+                                path_summary.append(f"🚇 {sub['lane'][0]['name']}")
+                            elif sub['trafficType'] == 2: 
+                                path_summary.append(f"🚌 {sub['lane'][0]['busNo']}")
+                            elif sub['trafficType'] == 3 and sub['distance'] > 0: 
+                                path_summary.append(f"🚶")
+                        st.caption(" → ".join(path_summary)) # 괄호 닫기 확인
+
                     with col2:
-                    # 지도 시각화 실행
+                        # 시각화 실행
                         m = draw_path_on_map(path)
                         st_folium(m, width=500, height=300, key=f"map_{i}")
                     
