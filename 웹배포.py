@@ -91,9 +91,9 @@ def analyze_path(path_data, user_type):
 
 # 시각화
 def draw_path_on_map(path_data):
-    start_y = path_data['info']['startY']
-    start_x = path_data['info']['startX']
-
+    start_y = path_data['info'].get('sy') or path_data['info'].get('startY')
+    start_x = path_data['info'].get('sx') or path_data['info'].get('startX')
+    
     # 지도 생성 (folium)
     m = folium.Map(location=[start_y, start_x], zoom_start=14)
 
