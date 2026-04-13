@@ -3,6 +3,8 @@ import pandas as pd
 import requests
 import pyproj
 from datetime import datetime
+import folium
+from streamlit_folium import st_folium
 
 st.set_page_config(page_title="장애인 대중교통 이용 소요시간", layout="wide")
 
