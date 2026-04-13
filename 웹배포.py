@@ -126,6 +126,8 @@ if search_btn:
                 n_time = path['info']['totalTime']
                 p_time, reason = analyze_path(path, user_type_code)
 
+                total_time = n_time + p_time
+
                 with st.expander(f"대안 {i+1}: 약 {total_time}분 소요"):
                     st.write(f"**지연 사유:** {reason if reason else '지연 없음'}")
                     
