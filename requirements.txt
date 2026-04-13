@@ -3,5 +3,4 @@ pandas
 requests
 pyproj
 pyarrow
-folium
-streamlit-folium
+
