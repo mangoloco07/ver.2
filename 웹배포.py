@@ -3,8 +3,6 @@ import pandas as pd
 import requests
 import pyproj
 from datetime import datetime
-import folium
-from streamlit_folium import st_folium
 
 st.set_page_config(page_title="장애인 대중교통 이용 소요시간", layout="wide")
 
@@ -91,32 +89,6 @@ def analyze_path(path_data, user_type):
 
     return penalty, ", ".join(list(set(reasons)))
 
-# 시각화
-def draw_path_on_map(path_data):
-    start_y = path_data['info'].get('sy') or path_data['info'].get('startY')
-    start_x = path_data['info'].get('sx') or path_data['info'].get('startX')
-    
-    # 지도 생성 (folium)
-    m = folium.Map(location=[start_y, start_x], zoom_start=14)
-
-    # 경로 선 그리기
-    for sub in path_data['subPath']:
-        if 'passStopList' in sub:
-            points = []
-            for station in sub['passStopList']['stations']:
-                points.append([float(station['y']), float(station['x'])])
-            
-            # 이동 수단별 색 지정
-            color = 'blue' if sub['trafficType'] == 1 else 'green' 
-            if sub['trafficType'] != 3: # 도보 제외 (표시 잘 안될 수도 있음)
-                folium.PolyLine(points, color=color, weight=5, opacity=0.7).add_to(m)
-
-    # 출발지/목적지 표시 
-    folium.Marker([start_y, start_x], popup="출발", icon=folium.Icon(color='red')).add_to(m)
-    folium.Marker([path_data['info']['endY'], path_data['info']['endX']], 
-                  popup="도착", icon=folium.Icon(color='black')).add_to(m)
-    
-    return m
 
 # UI 구성
 st.title("♿ 장애인의 대중교통 이용 소요시간")
@@ -154,29 +126,24 @@ if search_btn:
                 n_time = path['info']['totalTime']
                 p_time, reason = analyze_path(path, user_type_code)
 
-                with st.expander(f"대안 {i+1}: 총 {n_time + p_time}분"):
-                    # 화면 분할
-                    col1, col2 = st.columns([1, 1]) 
+                with st.expander(f"대안 {i+1}: 약 {total_time}분 소요"):
+                    st.write(f"**지연 사유:** {reason if reason else '지연 없음'}")
                     
-                    with col1:
-                        st.write(f"**지연 사유:** {reason if reason else '없음'}")
-                        st.info(f"일반 시간: {n_time}분 / 지연 패널티: {p_time}분")
-                        
-                        # 경로 상세 정보
-                        path_summary = []
-                        for sub in path['subPath']:
-                            if sub['trafficType'] == 1: 
-                                path_summary.append(f"🚇 {sub['lane'][0]['name']}")
-                            elif sub['trafficType'] == 2: 
-                                path_summary.append(f"🚌 {sub['lane'][0]['busNo']}")
-                            elif sub['trafficType'] == 3 and sub['distance'] > 0: 
-                                path_summary.append(f"🚶")
-                        st.caption(" → ".join(path_summary)) # 괄호 닫기 확인
+                    c1, c2 = st.columns(2)
+                    c1.metric("일반 소요 시간", f"{n_time}분")
+                    c2.metric("지연 패널티", f"+{p_time}분", delta_color="inverse")
 
-                    with col2:
-                        # 시각화 실행
-                        m = draw_path_on_map(path)
-                        st_folium(m, width=500, height=300, key=f"map_{i}")
+                    # 경로 상세 정보
+                    path_summary = []
+                    for sub in path['subPath']:
+                        if sub['trafficType'] == 1: 
+                            path_summary.append(f"🚇 {sub['lane'][0]['name']}")
+                        elif sub['trafficType'] == 2: 
+                            path_summary.append(f"🚌 {sub['lane'][0]['busNo']}")
+                        elif sub['trafficType'] == 3 and sub['distance'] > 0: 
+                            path_summary.append(f"🚶")
+                    st.markdown(f"**경로:** {' → '.join(path_summary)}")
+                   
                     
         else:
             st.error("오류")
